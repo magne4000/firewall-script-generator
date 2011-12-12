@@ -131,7 +131,8 @@ start() {
 
   # ICMP : ping request
   $IPT -A INPUT -p icmp --icmp-type ping -m limit --limit 5/s -j LOG --log-prefix "[PING4] "
-  $IPT -A INPUT -p icmp --icmp-type ping -m limit --limit 10/s -j ACCEPT
+  $IPT -A INPUT ! -i $WAN -p icmp --icmp-type ping -m limit --limit 10/s -j ACCEPT
+  $IPT -A INPUT ! -i $WAN -p icmp -j DROP
 
   # Invalid stuff
   $IPT -A INPUT -p tcp --tcp-flags ALL NONE -j INVALID
