@@ -1,7 +1,7 @@
 Firewall Script Generator
 =========================
 
-Generates a bash script containing advanced iptables rules.
+Generates a bash script containing advanced iptables rules in order to share internet connection with LAN users.
 
 Installation
 ------------
