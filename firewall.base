@@ -17,64 +17,64 @@ IPT_SAVE=/sbin/iptables-save
 
 # BEGIN WAN
 
-WAN=%s
-WAN_IP=%s
+WAN={wan}
+WAN_IP={wan_ip}
 
 # END WAN
 # BEGIN LAN
 
-LAN=%s
-LAN_IP=%s
-LAN_R=%s
+LAN={lan}
+LAN_IP={lan_ip}
+LAN_R={lan_r}
 
 # END LAN
 # BEGIN CLIENTS
 
 CLIENTS=(
-%s
+{clients}
 )
 
 # END CLIENTS
 # BEGIN CLIENTS PORTS
 
-%s
+{clients_ports}
 
 CLIENTS_TCP_PORTS="
-%s
+{clients_tcp_ports}
 "
 CLIENTS_UDP_PORTS="
-%s
+{clients_udp_ports}
 "
 
 # END CLIENTS PORTS
 # BEGIN SERVICES PORTS
 
-%s
+{services_ports}
 
 SERVICES_TCP_PORTS="
-%s
+{services_tcp_ports}
 "
 SERVICES_UDP_PORTS="
-%s
+{services_udp_ports}
 "
 
 # END SERVICES PORTS
 # BEGIN RESTRICTED SERVICES PORTS
 
-%s
+{restricted_services_ports}
 
 RESTRICTED_SERVICES_TCP_PORTS="
-%s
+{restricted_services_tcp_ports}
 "
 RESTRICTED_SERVICES_UDP_PORTS="
-%s
+{restricted_services_udp_ports}
 "
 
 # END RESTRICTED SERVICES PORTS
 # BEGIN PORT FORWARDING
 
 FORWARD_RULES=(
-%s
+{forward_rules}
 )
 
 # END PORT FORWARDING
@@ -96,7 +96,7 @@ $IPT_SAVE -c > $TMP_FILE
 
 # BEGIN START
 
-start() {
+start() {{
 
   ##################
   #  Kernel stuff  #
@@ -162,7 +162,7 @@ start() {
   fi
 
   # Clients
-  OIFS=$IFS; for i in ${CLIENTS[*]}; do IFS='!'; set $i; IP=$1;
+  OIFS=$IFS; for i in ${{CLIENTS[*]}}; do IFS='!'; set $i; IP=$1;
     FORWARD_S="-A FORWARD -s $IP "
     COUNTER=$(grep -e "$FORWARD_S" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
     PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
@@ -202,7 +202,7 @@ start() {
   done; done
 
   # Forwarding
-  OIFS=$IFS; for i in ${FORWARD_RULES[*]}; do IFS='!'; set $i; PORT_FROM=$1; TO=$2; IFS=':'; set $TO; IP_TO=$1; PORT_TO=$2; IFS=$OIFS
+  OIFS=$IFS; for i in ${{FORWARD_RULES[*]}}; do IFS='!'; set $i; PORT_FROM=$1; TO=$2; IFS=':'; set $TO; IP_TO=$1; PORT_TO=$2; IFS=$OIFS
     $IPT -t nat -A PREROUTING -d $WAN_IP -p tcp -i $WAN --dport $PORT_FROM -j DNAT --to $IP_TO:$PORT_TO
     $IPT -A FORWARD -p tcp -i $WAN -d $IP_TO --dport $PORT_TO -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 	$IPT -t nat -A POSTROUTING -p tcp -j SNAT -o $LAN --dport $PORT_TO --to-source $LAN_IP
@@ -237,12 +237,12 @@ start() {
   #$IP6T -A INPUT -j LOG --log-prefix "[DROP6] "
   #$IP6T -A FORWARD -j LOG --log-prefix "[FW6] "
 
-}
+}}
 
 # END START
 # BEGIN STOP
 
-stop() {
+stop() {{
   # Kernel stuff
   echo 0 > /proc/sys/net/ipv4/ip_forward
   # for f in /proc/sys/net/ipv4/conf/*/rp_filter ; do echo 0 > $f ; done
@@ -274,7 +274,7 @@ stop() {
   $IPT -t nat -P PREROUTING ACCEPT
   $IPT -t nat -P POSTROUTING ACCEPT
   $IPT -t nat -P OUTPUT ACCEPT
-}
+}}
 
 # END STOP
 

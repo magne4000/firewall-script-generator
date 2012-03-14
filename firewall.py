@@ -4,14 +4,19 @@
 from argparse import ArgumentParser
 from difflib import unified_diff
 from os.path import isfile
+from bs4 import BeautifulSoup
+import ConfigParser
 import re
 import sys
+import os
 
+config = ConfigParser.RawConfigParser()
+config.read(os.path.dirname( __file__ ) + '\\firewall.conf')
 # base script filepath
-BASE_SCRIPT_PATH='/etc/conf.d/firewall.base'
+BASE_SCRIPT_PATH=config.get('path', 'script.base')
 
 # script filepath (generated file)
-SCRIPT_FILE='/etc/conf.d/firewall'
+SCRIPT_FILE=config.get('path', 'script.gen')
 
 class Service:
     
@@ -143,9 +148,10 @@ class Client:
                     return
             else:
                 raise ValueError('IP address "%s" is not valid.' % value)
-        elif name == 'mac':
-            if not self._check_mac(value):
-                raise ValueError('MAC address "%s" is not valid.' % value)
+        elif name == 'macs':
+            for mac in value:
+                if not self._check_mac(mac):
+                    raise ValueError('MAC address "%s" is not valid.' % mac)
         elif name == 'identifier':
             if not self._check_identifier(value):
                 raise ValueError('Identifier "%s" is not valid.' % value)
@@ -355,11 +361,11 @@ class Script:
             l_services.append('%s="%s"' % (self._service_to_sh_var(service), service.s_ports))
         return '\n'.join(l_services)
     
-    def _raw_input(self, prompt, regex, format, cpt=3):
+    def _raw_input(self, prompt, regex, myformat, cpt=3):
         s = ''
         while cpt > 0:
             s = raw_input('%s : ' % prompt)
-            if regex.match(format % s) is not None:
+            if regex.match(myformat % s) is not None:
                 break
             print 'Incorrect value.'
             cpt -= 1
@@ -403,39 +409,43 @@ class Script:
     
     def save(self, diff=True):
         base_script = BaseScript()
-        new_content = base_script.script_content % (
-            self.wan,
-            self.wan_ip,
-            self.lan,
-            self.lan_ip,
-            self.lan_r,
-            self._clients_to_string(),
-            self._services_to_string(self.services.get('tcp', external=True), self.services.get('udp', external=True)),
-            self._get_tcp_ports_lines(self.services.get('tcp', external=True)),
-            self._get_udp_ports_lines(self.services.get('udp', external=True)),
-            self._services_to_string(self.services.get('tcp', external=False, restricted=False), self.services.get('udp', external=False, restricted=False)),
-            self._get_tcp_ports_lines(self.services.get('tcp', external=False, restricted=False)),
-            self._get_udp_ports_lines(self.services.get('udp', external=False, restricted=False)),
-            self._services_to_string(self.services.get('tcp', external=False, restricted=True), self.services.get('udp', external=False, restricted=True)),
-            self._get_tcp_ports_lines(self.services.get('tcp', external=False, restricted=True)),
-            self._get_udp_ports_lines(self.services.get('udp', external=False, restricted=True)),
-            self._forward_rules_to_string()
+        new_content = base_script.script_content.format(
+            wan=self.wan,
+            wan_ip=self.wan_ip,
+            lan=self.lan,
+            lan_ip=self.lan_ip,
+            lan_r=self.lan_r,
+            clients=self._clients_to_string(),
+            clients_ports=self._services_to_string(self.services.get('tcp', external=True), self.services.get('udp', external=True)),
+            clients_tcp_ports=self._get_tcp_ports_lines(self.services.get('tcp', external=True)),
+            clients_udp_ports=self._get_udp_ports_lines(self.services.get('udp', external=True)),
+            services_ports=self._services_to_string(self.services.get('tcp', external=False, restricted=False), self.services.get('udp', external=False, restricted=False)),
+            services_tcp_ports=self._get_tcp_ports_lines(self.services.get('tcp', external=False, restricted=False)),
+            services_udp_ports=self._get_udp_ports_lines(self.services.get('udp', external=False, restricted=False)),
+            restricted_services_ports=self._services_to_string(self.services.get('tcp', external=False, restricted=True), self.services.get('udp', external=False, restricted=True)),
+            restricted_services_tcp_ports=self._get_tcp_ports_lines(self.services.get('tcp', external=False, restricted=True)),
+            restricted_services_udp_ports=self._get_udp_ports_lines(self.services.get('udp', external=False, restricted=True)),
+            forward_rules=self._forward_rules_to_string()
         )
         if diff:
-            print
-            sys.stdout.writelines(unified_diff(self.script_content.splitlines(1), new_content.splitlines(1)))
-            print
-            for i in xrange(3):
-                s = raw_input('Apply this changes ? [Y/N] : ')
-                if s.upper() == 'N':
-                    print 'Script file NOT saved.'
-                    return 0
-                elif s.upper() == 'Y':
-                    self._init_file_handler(mode='w')
-                    self.fh.write(new_content)
-                    self._close_file_handler()
-                    print 'Script file saved.'
-                    return 0
+            sdiff = unified_diff(self.script_content.splitlines(1), new_content.splitlines(1))
+            if not sdiff:
+                print 'Nothing to do.'
+            else:
+                print
+                sys.stdout.writelines(unified_diff(self.script_content.splitlines(1), new_content.splitlines(1)))
+                print
+                for _ in xrange(3):
+                    s = raw_input('Apply this changes ? [Y/N] : ')
+                    if s.upper() == 'N':
+                        print 'Script file NOT saved.'
+                        return 0
+                    elif s.upper() == 'Y':
+                        self._init_file_handler(mode='w')
+                        self.fh.write(new_content)
+                        self._close_file_handler()
+                        print 'Script file saved.'
+                        return 0
         else:
             self.fh.write(new_content)
             self._close_file_handler()
