@@ -10,7 +10,15 @@ import sys
 import os
 
 config = ConfigParser.RawConfigParser()
-config.read('/etc/conf.d/firewall.conf')
+if isfile('./firewall.conf'):
+    config.read('./firewall.conf')
+elif isfile(os.getenv('HOME') + '/.config/firewall.conf'):
+    config.read(os.getenv('HOME') + '/.config/firewall.conf')
+elif isfile('/etc/conf.d/firewall.conf'):
+    config.read('/etc/conf.d/firewall.conf')
+else:
+    print 'firewall.conf not found.'
+    os._exit(1)
 # base script filepath
 BASE_SCRIPT_PATH=config.get('path', 'script.base')
 
@@ -118,9 +126,13 @@ class Client:
         self.enabled = enabled
         self.open_all_ports = open_all_ports
     
-    def _check_mac(self, mac):
+    @staticmethod
+    def check_mac(mac):
         re_mac = re.compile(Script.S_RE_MAC)
         return re_mac.match(mac) is not None
+
+    def _check_mac(self, mac):
+        return Client.check_mac(mac)
     
     def _check_identifier(self, identifier):
         if identifier is None:
@@ -448,11 +460,15 @@ class Script:
         )
         if diff:
             sdiff = unified_diff(self.script_content.splitlines(1), new_content.splitlines(1))
-            if not sdiff:
+            bdiff = False
+            for a in sdiff:
+                bdiff = True
+                break
+            if not bdiff:
                 print 'Nothing to do.'
             else:
                 print
-                sys.stdout.writelines(unified_diff(self.script_content.splitlines(1), new_content.splitlines(1)))
+                sys.stdout.writelines(sdiff)
                 print
                 for _ in xrange(3):
                     s = raw_input('Apply this changes ? [Y/N] : ')
@@ -602,18 +618,21 @@ def addclient(args, script):
         except ValueError as e:
             print e
             sys.exit(1)
-        print 'Client %s successfully added.' % args.identifier
+        print 'Adding client %s.' % args.identifier
     else:
         if args.ip:
             print 'Client %s already exists. Skipping IP address. In order to change it, use setclient.' % args.identifier
         script.clients.remove(existing_client)
         for mac in args.macs:
-            if existing_client.macs.count(mac) > 0:
-                print 'Skipping MAC address "%s" which is already registered for %s.' % (mac, args.identifier)
+            if Client.check_mac(mac):
+                if existing_client.macs.count(mac) > 0:
+                    print 'Skipping MAC address "%s" which is already registered for %s.' % (mac, args.identifier)
+                else:
+                    existing_client.macs.append(mac)
             else:
-                existing_client.macs.append(mac)
+                print 'Skipping invalid MAC address "%s"' % mac
         script.clients.append(existing_client)
-        print 'Client %s successfully updated.' % args.identifier
+        print 'Updating client %s.' % args.identifier
     script.save()
 
 def setclient(args, script):
