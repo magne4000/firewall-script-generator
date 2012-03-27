@@ -221,8 +221,8 @@ class Script:
     
     S_RE_IP='\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?'
     S_RE_MAC='(?:[0-9a-fA-F]){2}(?::(?:[0-9a-fA-F]){2}){5}'
-    RE_CLIENTS=re.compile('^CLIENTS=\($\n(.*)\n^\)$', re.M|re.S)
-    RE_CLIENTS_U=re.compile('^CLIENTS_U=\($\n(.*)\n^\)$', re.M|re.S)
+    RE_CLIENTS=re.compile('^CLIENTS=\($\n(.*?)\n^\)$', re.M|re.S)
+    RE_CLIENTS_U=re.compile('^CLIENTS_U=\($\n(.*?)\n^\)$', re.M|re.S)
     RE_CLIENT=re.compile('\s*(#\s*)?(%s)!((?:%s)(?:,(?:%s))*)\s+#\s+(\w+)' % (S_RE_IP, S_RE_MAC, S_RE_MAC))
     RE_FORWARD_RULES=re.compile('^FORWARD_RULES=\($\n(.*)\n^\)$', re.M|re.S)
     RE_FORWARD_RULE=re.compile('\s*(\d+)!(%s):(\d+)' % S_RE_IP_WITHOUT_MASK)
