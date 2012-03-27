@@ -34,6 +34,10 @@ CLIENTS=(
 {clients}
 )
 
+CLIENTS_U=(
+{clients_u}
+)
+
 # END CLIENTS
 # BEGIN CLIENTS PORTS
 
@@ -161,7 +165,7 @@ start() {{
     rm -fr "$MUNIN_PLUGINS_PATH_TO/ip_*"
   fi
 
-  # Clients
+  # Classic clients
   OIFS=$IFS; for i in ${{CLIENTS[*]}}; do IFS='!'; set $i; IP=$1;
     FORWARD_S="-A FORWARD -s $IP "
     COUNTER=$(grep -e "$FORWARD_S" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
@@ -189,13 +193,51 @@ start() {{
       FILE_NAME_IP="$( echo $IP | sed 's~/~_~g' )"
       ln -fs "$MUNIN_PLUGINS_PATH_FROM/ip_" "$MUNIN_PLUGINS_PATH_TO/ip_$FILE_NAME_IP"
 	fi
-
+	
     for j in $2; do IFS=','; for MAC in $j; do IFS=$OIFS
       for c_tcp_ports in $CLIENTS_TCP_PORTS; do $IPT -A FORWARD -i $LAN -s $IP -o $WAN -p tcp -m mac --mac-source $MAC -m multiport --dports $c_tcp_ports -m state --state NEW -j ACCEPT; done
       for c_udp_ports in $CLIENTS_UDP_PORTS; do $IPT -A FORWARD -i $LAN -s $IP -o $WAN -p udp -m mac --mac-source $MAC -m multiport --dports $c_udp_ports -m state --state NEW -j ACCEPT; done
       # Restricted services
       for rs_tcp_ports in $RESTRICTED_SERVICES_TCP_PORTS; do $IPT -A INPUT -i $LAN -s $LAN_R -p tcp -m mac --mac-source $MAC -m multiport --dports $rs_tcp_ports -m state --state NEW -j ACCEPT; done
       for rs_udp_ports in $RESTRICTED_SERVICES_UDP_PORTS; do $IPT -A INPUT -i $LAN -s $LAN_R -p udp -m mac --mac-source $MAC -m multiport --dports $rs_udp_ports -m state --state NEW -j ACCEPT; done
+      # ICMP
+      $IPT -A FORWARD -i $LAN -p icmp --icmp-type ping -m mac --mac-source $MAC -m limit --limit 10/s -j ACCEPT
+    done
+  done; done
+  
+  # Unrestricted clients
+  OIFS=$IFS; for i in ${{CLIENTS_U[*]}}; do IFS='!'; set $i; IP=$1;
+    FORWARD_S="-A FORWARD -s $IP "
+    COUNTER=$(grep -e "$FORWARD_S" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
+    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
+    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":")
+
+    if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
+      $IPT -I FORWARD -s $IP -c $PACKET_COUNTER $BIT_COUNTER;
+    else
+      $IPT -I FORWARD -s $IP;
+    fi
+
+    FORWARD_S="-A FORWARD -d $IP "
+    COUNTER=$(grep -e "$FORWARD_S" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
+    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
+    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":")
+
+    if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
+      $IPT -I FORWARD -d $IP -c $PACKET_COUNTER $BIT_COUNTER;
+    else
+      $IPT -I FORWARD -d $IP;
+    fi
+
+    if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
+      FILE_NAME_IP="$( echo $IP | sed 's~/~_~g' )"
+      ln -fs "$MUNIN_PLUGINS_PATH_FROM/ip_" "$MUNIN_PLUGINS_PATH_TO/ip_$FILE_NAME_IP"
+	fi
+	
+    for j in $2; do IFS=','; for MAC in $j; do IFS=$OIFS
+      $IPT -A FORWARD -i $LAN -s $IP -o $WAN -m mac --mac-source $MAC -m state --state NEW -j ACCEPT
+      # Services
+      $IPT -A INPUT -i $LAN -s $LAN_R -m mac --mac-source $MAC -m state --state NEW -j ACCEPT
       # ICMP
       $IPT -A FORWARD -i $LAN -p icmp --icmp-type ping -m mac --mac-source $MAC -m limit --limit 10/s -j ACCEPT
     done
