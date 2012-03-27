@@ -4,14 +4,13 @@
 from argparse import ArgumentParser
 from difflib import unified_diff
 from os.path import isfile
-from bs4 import BeautifulSoup
 import ConfigParser
 import re
 import sys
 import os
 
 config = ConfigParser.RawConfigParser()
-config.read(os.path.dirname( __file__ ) + '\\firewall.conf')
+config.read('/etc/conf.d/firewall.conf')
 # base script filepath
 BASE_SCRIPT_PATH=config.get('path', 'script.base')
 
@@ -112,11 +111,12 @@ class Service:
 
 class Client:
     
-    def __init__(self, ip=None, macs=[], identifier=None, enabled=True):
+    def __init__(self, ip=None, macs=[], identifier=None, enabled=True, open_all_ports=False):
         self.ip = ip
         self.macs = macs
         self.identifier = self._clean(identifier)
         self.enabled = enabled
+        self.open_all_ports = open_all_ports
     
     def _check_mac(self, mac):
         re_mac = re.compile(Script.S_RE_MAC)
@@ -222,6 +222,7 @@ class Script:
     S_RE_IP='\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?'
     S_RE_MAC='(?:[0-9a-fA-F]){2}(?::(?:[0-9a-fA-F]){2}){5}'
     RE_CLIENTS=re.compile('^CLIENTS=\($\n(.*)\n^\)$', re.M|re.S)
+    RE_CLIENTS_U=re.compile('^CLIENTS_U=\($\n(.*)\n^\)$', re.M|re.S)
     RE_CLIENT=re.compile('\s*(#\s*)?(%s)!((?:%s)(?:,(?:%s))*)\s+#\s+(\w+)' % (S_RE_IP, S_RE_MAC, S_RE_MAC))
     RE_FORWARD_RULES=re.compile('^FORWARD_RULES=\($\n(.*)\n^\)$', re.M|re.S)
     RE_FORWARD_RULE=re.compile('\s*(\d+)!(%s):(\d+)' % S_RE_IP_WITHOUT_MASK)
@@ -285,8 +286,9 @@ class Script:
     
     def _parse_clients(self):
         clients = self.RE_CLIENTS.findall(self._get_section(self.SECTION_CLIENTS))
-        if clients is not None:
-            self.clients = []
+        clients_u = self.RE_CLIENTS_U.findall(self._get_section(self.SECTION_CLIENTS))
+        self.clients = []
+        if clients is not None and len(clients) > 0:
             for client in clients[0].split('\n'):
                 new_client = Client()
                 match = self.RE_CLIENT.match(client.strip())
@@ -296,6 +298,19 @@ class Script:
                     new_client.macs = macs.split(',')
                     new_client.identifier = identifier
                     new_client.enabled = (comment is None or len(comment.strip()) == 0)
+                    new_client.open_all_ports = False
+                    self.clients.append(new_client)
+        if clients_u is not None and len(clients_u) > 0:
+            for client in clients_u[0].split('\n'):
+                new_client = Client()
+                match = self.RE_CLIENT.match(client.strip())
+                if match is not None:
+                    comment, ip, macs, identifier = match.groups()
+                    new_client.ip = ip
+                    new_client.macs = macs.split(',')
+                    new_client.identifier = identifier
+                    new_client.enabled = (comment is None or len(comment.strip()) == 0)
+                    new_client.open_all_ports = True
                     self.clients.append(new_client)
 
     def _parse_services(self, external=True, restricted=False):
@@ -348,7 +363,10 @@ class Script:
         return '\n'.join(['$%s' % (self._service_to_sh_var(service)) for service in services])
     
     def _clients_to_string(self):
-        return '\n'.join([client.to_string() for client in self.clients])
+        return '\n'.join([client.to_string() for client in self.clients if not client.open_all_ports])
+    
+    def _clients_u_to_string(self):
+        return '\n'.join([client.to_string() for client in self.clients if client.open_all_ports])
     
     def _forward_rules_to_string(self):
         return '\n'.join(['  %s!%s:%s' % (port_from, to[0], to[1]) for port_from, to in self.forward_rules.iteritems()])
@@ -416,6 +434,7 @@ class Script:
             lan_ip=self.lan_ip,
             lan_r=self.lan_r,
             clients=self._clients_to_string(),
+            clients_u=self._clients_u_to_string(),
             clients_ports=self._services_to_string(self.services.get('tcp', external=True), self.services.get('udp', external=True)),
             clients_tcp_ports=self._get_tcp_ports_lines(self.services.get('tcp', external=True)),
             clients_udp_ports=self._get_udp_ports_lines(self.services.get('udp', external=True)),
@@ -579,7 +598,7 @@ def addclient(args, script):
                     print 'IP address "%s" is on the same subnetwork as "%s". Aborting.' % (args.ip, client.ip)
                     return
         try:
-            script.clients.append(Client(args.ip, args.macs, args.identifier))
+            script.clients.append(Client(args.ip, args.macs, args.identifier, open_all_ports=args.open_all_ports))
         except ValueError as e:
             print e
             sys.exit(1)
@@ -723,6 +742,7 @@ if __name__ == '__main__':
     parser_addclient.add_argument("identifier", metavar='IDENTIFIER', help='Client identifier to be added')
     parser_addclient.add_argument("ip", nargs='?', metavar='IP[/MASK]', help='IP or range of IP with MASK (ex:10.10.10.0/24) of the client to be added')
     parser_addclient.add_argument("macs", nargs='+', metavar='MAC', help='MAC address(es) of the client to be added')
+    parser_addclient.add_argument("-o", "--open-all-ports", dest='open_all_ports', action='store_true', help='If this option is set, the firewall open all ports for the client')
     parser_addclient.set_defaults(func=addclient)
     #setclient parser
     parser_setclient = subparsers.add_parser('setclient', help='Set IP address of a client')
