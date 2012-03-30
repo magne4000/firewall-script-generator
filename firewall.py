@@ -749,6 +749,17 @@ def list_all(args, script):
     print ' -- Services --'
     list_services(args, script)
 
+def info(args, script):
+    searchme = re.compile('%s' % args.clientorservice, re.I)
+    for client in script.get_clients():
+        if searchme.search(client.identifier) is not None:
+            print '\n', client
+    services = sorted(Service.get('both', all=True), key=lambda service: service.name)
+    for service in services:
+        if searchme.search(service.name) is not None:
+            print '\n', service
+    
+
 if __name__ == '__main__':
     parser = ArgumentParser(description="Firewall")
     
@@ -814,6 +825,10 @@ if __name__ == '__main__':
     #list all parser
     parser_list_all = subparser_list.add_parser('all', help='List all clients and services')
     parser_list_all.set_defaults(func=list_all)
+    #info parser
+    parser_info = subparsers.add_parser('info', help='Get informations on designated service or client')
+    parser_info.add_argument("clientorservice", metavar='CLIENT | SERVICE', help='Client or Service identifier')
+    parser_info.set_defaults(func=info)
     
     args = parser.parse_args()
     script = Script()
