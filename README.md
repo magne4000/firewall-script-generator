@@ -6,18 +6,22 @@ Generates a bash script containing advanced iptables rules in order to share int
 Installation
 ------------
 
-Move *firewall* to /usr/local/bin and make it executable
+Move *firewall.py* to /usr/local/bin/ and make it executable
 
-    mv firewall /usr/local/bin
+    mv firewall /usr/local/bin/firewall
     chmod +x /usr/local/bin/firewall
 
-Move *firewall.base* to /etc/conf.d (the folder /etc/conf.d must exists).
+Move *firewall.base* and *firewall.conf* to /etc/conf.d/.
 
-    mv firewall /etc/conf.d
+    mv firewall.base firewall.conf /etc/conf.d/
 
-The generated file is created in /etc/conf.d/firewall.
+Configuration
+-------------
 
-In order to change this, edit the *firewall* file and change the value of *SCRIPT_FILE* variable.
+Modify the *firewall.conf* file
+
+script.base : path to filerawall.base file
+script.gen : path where script file to be executed will be generated
 
 Munin related stuffs
 --------------------
