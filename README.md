@@ -8,7 +8,7 @@ Installation
 
 Move *firewall.py* to /usr/local/bin/ and make it executable
 
-    mv firewall /usr/local/bin/firewall
+    mv firewall.py /usr/local/bin/firewall
     chmod +x /usr/local/bin/firewall
 
 Move *firewall.base* and *firewall.conf* to /etc/conf.d/.
@@ -20,17 +20,17 @@ Configuration
 
 Modify the *firewall.conf* file
 
-script.base : path to filerawall.base file
+script.base : path to filerawall.base file  
 script.gen : path where script file to be executed will be generated
 
 Munin related stuffs
 --------------------
 
-It's possible to bind this script with munin to generate graph per ip range.
-In order to do so, copy the file *ip_* under the *munin_plugins* folder to your munin plugin folder (replace the old one).
+It's possible to bind this script with munin to generate graph per ip range.  
+In order to do so, copy the file *ip_* under the *munin_plugins* folder to your munin plugin folder (replace the old one).  
 Configure munin to use this plugin (this is not treated here).
 
-Then activate Munin plugin in the *firewall.base* file by setting *MUNIN* variable to 1.
+Then activate Munin plugin in the *firewall.base* file by setting *MUNIN* variable to 1.  
 The variables *MUNIN_PLUGINS_PATH_FROM*, *MUNIN_PLUGINS_PATH_TO*, *MUNIN_NODE_RESTART_CMD* should be modified to fit your system.
 
 Usage
