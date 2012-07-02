@@ -119,8 +119,7 @@ class Service:
 
 class Client:
     
-    def __init__(self, ip=None, macs=[], identifier=None, enabled=True, open_all_ports=False):
-        self.ip = ip
+    def __init__(self, macs=[], identifier=None, enabled=True, open_all_ports=False):
         self.macs = macs
         self.identifier = self._clean(identifier)
         self.enabled = enabled
@@ -140,27 +139,8 @@ class Client:
         re_identifier = re.compile('\w+')
         return re_identifier.match(identifier) is not None
     
-    def _check_ip(self, ip):
-        if ip is None:
-            return True
-        re_ip = re.compile('^%s$' % Script.S_RE_IP)
-        return re_ip.match(ip) is not None
-    
-    def _check_ip_without_mask(self, ip):
-        if ip is None:
-            return True
-        re_ip = re.compile('^%s$' % Script.S_RE_IP_WITHOUT_MASK)
-        return re_ip.match(ip) is not None
-    
     def __setattr__(self, name, value):
-        if name == 'ip':
-            if self._check_ip(value):
-                if self._check_ip_without_mask(value):
-                    self.__dict__[name] = '%s/24' % value
-                    return
-            else:
-                raise ValueError('IP address "%s" is not valid.' % value)
-        elif name == 'macs':
+        if name == 'macs':
             for mac in value:
                 if not self._check_mac(mac):
                     raise ValueError('MAC address "%s" is not valid.' % mac)
@@ -175,10 +155,10 @@ class Client:
         return re.sub('\s+', '_', identifier)
     
     def to_string(self):
-        return '%s  %s!%s # %s' % ('' if self.enabled else '#', self.ip, ','.join(self.macs), self.identifier)
+        return '%s  %s # %s' % ('' if self.enabled else '#', ','.join(self.macs), self.identifier)
     
     def __str__(self):
-        return 'Identifier : %s\nIP : %s\nMACS : %s' % (self.identifier, self.ip, ', '.join(self.macs))
+        return 'Identifier : %s\nMACS : %s' % (self.identifier, ', '.join(self.macs))
 
 class BaseScript:
     
@@ -235,7 +215,7 @@ class Script:
     S_RE_MAC='(?:[0-9a-fA-F]){2}(?::(?:[0-9a-fA-F]){2}){5}'
     RE_CLIENTS=re.compile('^CLIENTS=\($\n(.*?)\n^\)$', re.M|re.S)
     RE_CLIENTS_U=re.compile('^CLIENTS_U=\($\n(.*?)\n^\)$', re.M|re.S)
-    RE_CLIENT=re.compile('\s*(#\s*)?(%s)!((?:%s)(?:,(?:%s))*)\s+#\s+(\w+)' % (S_RE_IP, S_RE_MAC, S_RE_MAC))
+    RE_CLIENT=re.compile('\s*(#\s*)?(?:%s!)?((?:%s)(?:,(?:%s))*)\s+#\s+(\w+)' % (S_RE_IP, S_RE_MAC, S_RE_MAC))
     RE_FORWARD_RULES=re.compile('^FORWARD_RULES=\($\n(.*)\n^\)$', re.M|re.S)
     RE_FORWARD_RULE=re.compile('\s*(\d+)!(%s):(\d+)' % S_RE_IP_WITHOUT_MASK)
     
@@ -305,8 +285,7 @@ class Script:
                 new_client = Client()
                 match = self.RE_CLIENT.match(client.strip())
                 if match is not None:
-                    comment, ip, macs, identifier = match.groups()
-                    new_client.ip = ip
+                    comment, macs, identifier = match.groups()
                     new_client.macs = macs.split(',')
                     new_client.identifier = identifier
                     new_client.enabled = (comment is None or len(comment.strip()) == 0)
@@ -317,8 +296,7 @@ class Script:
                 new_client = Client()
                 match = self.RE_CLIENT.match(client.strip())
                 if match is not None:
-                    comment, ip, macs, identifier = match.groups()
-                    new_client.ip = ip
+                    comment, macs, identifier = match.groups()
                     new_client.macs = macs.split(',')
                     new_client.identifier = identifier
                     new_client.enabled = (comment is None or len(comment.strip()) == 0)
@@ -491,30 +469,6 @@ class Script:
     def get_clients(self):
         return self.clients
 
-def ip2int(ip):
-    ret = 0
-    match = re.match("(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", ip)
-    if not match:
-        raise ValueError('IP address "%s" is not valid.' % ip)
-    for i in xrange(4):
-        member = int(match.group(i+1))
-        if member < 0 or member > 255:
-            raise ValueError('IP address "%s" is not valid.' % ip)
-        ret = (ret << 8) + member
-    return ret
-
-def int_mask_to_bin(mask):
-    return int(("%s%s" % (mask * "1", (32-mask) * "0")), 2)
-
-def same_subnetwork(ip1, ip2, mask):
-    mask = int(mask)
-    if mask < 0 or mask > 32:
-        raise ValueError('Mask address "%s" is not valid.' % mask)
-    int_ip1 = ip2int(ip1)
-    int_ip2 = ip2int(ip2)
-    bin_mask = int_mask_to_bin(mask)
-    return (int_ip1 & bin_mask) == (int_ip2 & bin_mask)
-
 def port_range_to_list(port_range):
     if str(port_range).count(':') > 0:
         x, y = port_range.split(':')
@@ -599,29 +553,13 @@ def addclient(args, script):
             break
     
     if not exists: # new client
-        args_ip, args_mask = None, None
-        if args.ip is None:
-            print 'Missing IP or MAC address. Aborting.'
-            return
-        if args.ip.count('/') == 0:
-            args_ip = args.ip
-        else:
-            args_ip, args_mask = args.ip.split('/')
-        for client in script.get_clients():
-            client_ip, client_mask = client.ip.split('/')
-            if args_mask is None or client_mask == args_mask: # address without mask or with the same mask
-                if same_subnetwork(client_ip, args_ip, client_mask):
-                    print 'IP address "%s" is on the same subnetwork as "%s". Aborting.' % (args.ip, client.ip)
-                    return
         try:
-            script.clients.append(Client(args.ip, args.macs, args.identifier, open_all_ports=args.open_all_ports))
+            script.clients.append(Client(args.macs, args.identifier, open_all_ports=args.open_all_ports))
         except ValueError as e:
             print e
             sys.exit(1)
         print 'Adding client %s.' % args.identifier
     else:
-        if args.ip:
-            print 'Client %s already exists. Skipping IP address. In order to change it, use setclient.' % args.identifier
         script.clients.remove(existing_client)
         for mac in args.macs:
             if Client.check_mac(mac):
@@ -633,20 +571,6 @@ def addclient(args, script):
                 print 'Skipping invalid MAC address "%s"' % mac
         script.clients.append(existing_client)
         print 'Updating client %s.' % args.identifier
-    script.save()
-
-def setclient(args, script):
-    existing_client = None
-    for client in script.get_clients():
-        if client.identifier.lower() == args.identifier.lower():
-            existing_client = client
-            break
-    if existing_client is None:
-        print 'Client "%s" doesn\'t exists, use addclient instead.' % args.identifier
-        return
-    script.clients.remove(existing_client)
-    existing_client.ip = args.ip
-    script.clients.append(existing_client)
     script.save()
 
 def delclient(args, script):
@@ -770,15 +694,9 @@ if __name__ == '__main__':
     #addclient parser
     parser_addclient = subparsers.add_parser('addclient', help='Add client')
     parser_addclient.add_argument("identifier", metavar='IDENTIFIER', help='Client identifier to be added')
-    parser_addclient.add_argument("ip", nargs='?', metavar='IP[/MASK]', help='IP or range of IP with MASK (ex:10.10.10.0/24) of the client to be added')
     parser_addclient.add_argument("macs", nargs='+', metavar='MAC', help='MAC address(es) of the client to be added')
     parser_addclient.add_argument("-o", "--open-all-ports", dest='open_all_ports', action='store_true', help='If this option is set, the firewall open all ports for the client')
     parser_addclient.set_defaults(func=addclient)
-    #setclient parser
-    parser_setclient = subparsers.add_parser('setclient', help='Set IP address of a client')
-    parser_setclient.add_argument("identifier", metavar='IDENTIFIER', help='Client identifier to be set')
-    parser_setclient.add_argument("ip", metavar='IP[/MASK]', help='IP or range of IP with MASK (ex:10.10.10.0/24) of the client to be set')
-    parser_setclient.set_defaults(func=setclient)
     #delclient parser
     parser_delclient = subparsers.add_parser('delclient', help='Delete MAC address(es) of a client, if no MAC adresse specified, delete the client')
     parser_delclient.add_argument("identifier", metavar='IDENTIFIER', help='Client identifier to be deleted')
