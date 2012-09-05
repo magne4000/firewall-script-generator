@@ -155,7 +155,7 @@ class Client:
         return re.sub('\s+', '_', identifier)
     
     def to_string(self):
-        return '%s  %s # %s' % ('' if self.enabled else '#', ','.join(self.macs), self.identifier)
+        return '%s %s!%s # %s' % ('' if self.enabled else '#', self.identifier, ','.join(self.macs), self.identifier)
     
     def __str__(self):
         return 'Identifier : %s\nMACS : %s' % (self.identifier, ', '.join(self.macs))
@@ -215,7 +215,7 @@ class Script:
     S_RE_MAC='(?:[0-9a-fA-F]){2}(?::(?:[0-9a-fA-F]){2}){5}'
     RE_CLIENTS=re.compile('^CLIENTS=\($\n(.*?)\n^\)$', re.M|re.S)
     RE_CLIENTS_U=re.compile('^CLIENTS_U=\($\n(.*?)\n^\)$', re.M|re.S)
-    RE_CLIENT=re.compile('\s*(#\s*)?(?:%s!)?((?:%s)(?:,(?:%s))*)\s+#\s+(\w+)' % (S_RE_IP, S_RE_MAC, S_RE_MAC))
+    RE_CLIENT=re.compile('\s*(#\s*)?(?:[a-zA-Z0-9]+!)?((?:%s)(?:,(?:%s))*)\s+#\s+(\w+)' % (S_RE_MAC, S_RE_MAC))
     RE_FORWARD_RULES=re.compile('^FORWARD_RULES=\($\n(.*)\n^\)$', re.M|re.S)
     RE_FORWARD_RULE=re.compile('\s*(\d+)!(%s):(\d+)' % S_RE_IP_WITHOUT_MASK)
     

@@ -1,0 +1,52 @@
+#!/bin/bash
+# -*- sh -*-
+. $MUNIN_LIBDIR/plugins/plugin.sh
+
+NAME=${0##*/client_}
+FORWARD=${forward:-FORWARD}
+
+if [ "$1" = "autoconf" ]; then
+    if [ -r /proc/net/dev ]; then
+        iptables -L ${FORWARD} -v -n -x >/dev/null 2>/dev/null
+        if [ $? -gt 0 ]; then
+            echo "no (could not run iptables as user `whoami`)"
+            exit 0
+        else
+            echo yes
+            exit 0
+        fi
+    else
+        echo "no (/proc/net/dev not found)"
+        exit 0
+    fi
+fi
+
+if [ "$1" = "suggest" ]; then
+    iptables -L ${FORWARD} -v -n -x 2>/dev/null | awk --posix '$14 ~ /^\/\*$/ { if (done[$15]!=1) {print $15; done[$15]=1;}}; $17 ~ /^\/\*$/ { if (done[$18]!=1) {print $18; done[$18]=1;}}' 
+    exit 0
+fi
+
+if [ "$1" = "config" ]; then
+    echo "graph_order forward"
+    title="$( echo $NAME | sed 's~\\/~/~g' )"
+    if [ -n "$hostname" ]; then
+        title="$hostname"
+    fi
+    echo "graph_title $title traffic"
+    echo 'graph_args --base 1000'
+    echo 'graph_vlabel bits per ${graph_period}'
+    echo 'graph_category network'
+    echo 'forward.label forwarded'
+    echo 'forward.type DERIVE'
+    echo 'forward.min 0'
+    echo 'forward.cdef forward,8,*'
+    print_warning forward
+    print_critical forward
+    exit 0
+fi;
+
+
+# Escape .'s so they don't match _everything_?
+NAME="$( echo $NAME | sed 's~\.~\\.~g' )"
+
+iptables -L ${FORWARD} -v -n -x  | awk '/\/\* '"${NAME}"' \*\// {SUM += $2} END { print "forward.value " SUM; }'

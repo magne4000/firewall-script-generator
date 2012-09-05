@@ -4,6 +4,11 @@
 # Magne Firewall base script  #
 # # # # # # # # # # # # # # # #
 
+MUNIN=0
+MUNIN_PLUGINS_PATH_FROM='/usr/share/munin/plugins'
+MUNIN_PLUGINS_PATH_TO='/etc/munin/plugins'
+MUNIN_NODE_RESTART_CMD='/etc/init.d/munin-node restart'
+
 set -ex
 
 IPT=/sbin/iptables
@@ -157,29 +162,57 @@ start() {{
 
   # Suppressions des liens munin des clients (wipe)
   if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
-    rm -fr "$MUNIN_PLUGINS_PATH_TO/ip_*"
+    rm -fr "$MUNIN_PLUGINS_PATH_TO/client_*"
   fi
 
   # Classic clients
-  OIFS=$IFS;for j in ${{CLIENTS[*]}}; do IFS=','; for MAC in $j; do IFS=$OIFS
-      for c_tcp_ports in $CLIENTS_TCP_PORTS; do $IPT -A FORWARD -i $LAN -o $WAN -p tcp -m mac --mac-source $MAC -m multiport --dports $c_tcp_ports -m state --state NEW -j ACCEPT; done
-      for c_udp_ports in $CLIENTS_UDP_PORTS; do $IPT -A FORWARD -i $LAN -o $WAN -p udp -m mac --mac-source $MAC -m multiport --dports $c_udp_ports -m state --state NEW -j ACCEPT; done
-      # Restricted services
-      for rs_tcp_ports in $RESTRICTED_SERVICES_TCP_PORTS; do $IPT -A INPUT -i $LAN -s $LAN_R -p tcp -m mac --mac-source $MAC -m multiport --dports $rs_tcp_ports -m state --state NEW -j ACCEPT; done
-      for rs_udp_ports in $RESTRICTED_SERVICES_UDP_PORTS; do $IPT -A INPUT -i $LAN -s $LAN_R -p udp -m mac --mac-source $MAC -m multiport --dports $rs_udp_ports -m state --state NEW -j ACCEPT; done
-      # ICMP
-      $IPT -A FORWARD -i $LAN -p icmp --icmp-type ping -m mac --mac-source $MAC -m limit --limit 10/s -j ACCEPT
-    done
+  OIFS=$IFS; for i in ${{CLIENTS[*]}}; do IFS='!'; set $i; NAME=$1; MACS=$2; IFS=','; for MAC in $MACS; do IFS=$OIFS
+    COUNTER=$(grep -i -e "$MAC" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
+    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
+    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":")
+
+    if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
+      $IPT -I FORWARD -m mac --mac-source $MAC -c $PACKET_COUNTER $BIT_COUNTER;
+    else
+      $IPT -I FORWARD -m mac --mac-source $MAC;
+    fi
+
+    if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
+      FILE_NAME_IP="$( echo $NAME | sed 's~/~_~g' )"
+      ln -fs "$MUNIN_PLUGINS_PATH_FROM/client_" "$MUNIN_PLUGINS_PATH_TO/client_$NAME"
+    fi
+    for c_tcp_ports in $CLIENTS_TCP_PORTS; do $IPT -A FORWARD -i $LAN -o $WAN -p tcp -m mac --mac-source $MAC -m multiport --dports $c_tcp_ports -m state --state NEW -m comment --comment "$NAME" -j ACCEPT; done
+    for c_udp_ports in $CLIENTS_UDP_PORTS; do $IPT -A FORWARD -i $LAN -o $WAN -p udp -m mac --mac-source $MAC -m multiport --dports $c_udp_ports -m state --state NEW -m comment --comment "$NAME" -j ACCEPT; done
+    # Restricted services
+    for rs_tcp_ports in $RESTRICTED_SERVICES_TCP_PORTS; do $IPT -A INPUT -i $LAN -s $LAN_R -p tcp -m mac --mac-source $MAC -m multiport --dports $rs_tcp_ports -m state --state NEW -j ACCEPT; done
+    for rs_udp_ports in $RESTRICTED_SERVICES_UDP_PORTS; do $IPT -A INPUT -i $LAN -s $LAN_R -p udp -m mac --mac-source $MAC -m multiport --dports $rs_udp_ports -m state --state NEW -j ACCEPT; done
+    # ICMP
+    $IPT -A FORWARD -i $LAN -p icmp --icmp-type ping -m mac --mac-source $MAC -m limit --limit 10/s -j ACCEPT
+   done
   done
-  
+
   # Unrestricted clients
-  OIFS=$IFS; for j in ${{CLIENTS_U[*]}}; do IFS=','; for MAC in $j; do IFS=$OIFS
-      $IPT -A FORWARD -i $LAN -o $WAN -m mac --mac-source $MAC -m state --state NEW -j ACCEPT
-      # Services
-      $IPT -A INPUT -i $LAN -s $LAN_R -m mac --mac-source $MAC -m state --state NEW -j ACCEPT
-      # ICMP
-      $IPT -A FORWARD -i $LAN -p icmp --icmp-type ping -m mac --mac-source $MAC -m limit --limit 10/s -j ACCEPT
-    done
+  OIFS=$IFS; for i in ${{CLIENTS_U[*]}}; do IFS='!'; set $i; NAME=$1; MACS=$2; IFS=','; for MAC in $MACS; do IFS=$OIFS
+    COUNTER=$(grep -i -e "$MAC" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
+    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
+    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":")
+
+    if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
+      $IPT -I FORWARD -m mac --mac-source $MAC -c $PACKET_COUNTER $BIT_COUNTER;
+    else
+      $IPT -I FORWARD -m mac --mac-source $MAC;
+    fi
+
+    if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
+      FILE_NAME_IP="$( echo $NAME | sed 's~/~_~g' )"
+      ln -fs "$MUNIN_PLUGINS_PATH_FROM/client_" "$MUNIN_PLUGINS_PATH_TO/client_$NAME"
+    fi
+    $IPT -A FORWARD -i $LAN -o $WAN -m mac --mac-source $MAC -m state --state NEW -m comment --comment "$NAME" -j ACCEPT
+    # Services
+    $IPT -A INPUT -i $LAN -s $LAN_R -m mac --mac-source $MAC -m state --state NEW -m comment --comment "$NAME" -j ACCEPT
+    # ICMP
+    $IPT -A FORWARD -i $LAN -p icmp --icmp-type ping -m mac --mac-source $MAC -m limit --limit 10/s -j ACCEPT
+   done
   done
 
   # Forwarding
@@ -188,6 +221,9 @@ start() {{
     $IPT -A FORWARD -p tcp -i $WAN -d $IP_TO --dport $PORT_TO -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
     $IPT -t nat -A POSTROUTING -p tcp -j SNAT -o $LAN --dport $PORT_TO --to-source $LAN_IP
   done
+
+  # CUSTOM RULES : VLAN administration
+  $IPT -A FORWARD -i eth3.10 -o $WAN -s 10.10.0.0/24 -m state --state NEW -j ACCEPT
 
   # NAT
   $IPT -t nat -A POSTROUTING -j SNAT -o $WAN --to-source $WAN_IP
@@ -271,5 +307,12 @@ case $1 in
     stop
     ;;
 esac
+
+rm $TMP_FILE
+
+# Restart munin-node if needed
+if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
+  $MUNIN_NODE_RESTART_CMD
+fi
 
 exit 0
