@@ -168,8 +168,8 @@ start() {{
   # Classic clients
   OIFS=$IFS; for i in ${{CLIENTS[*]}}; do IFS='!'; set $i; NAME=$1; MACS=$2; IFS=','; for MAC in $MACS; do IFS=$OIFS
     COUNTER=$(grep -i -e "$MAC" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
-    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
-    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":")
+    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":" | awk '{{SUM += $1}} END {{ print SUM; }}')
+    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":" | awk '{{SUM += $1}} END {{ print SUM; }}')
 
     if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
       $IPT -I FORWARD -m mac --mac-source $MAC -c $PACKET_COUNTER $BIT_COUNTER;
@@ -194,8 +194,8 @@ start() {{
   # Unrestricted clients
   OIFS=$IFS; for i in ${{CLIENTS_U[*]}}; do IFS='!'; set $i; NAME=$1; MACS=$2; IFS=','; for MAC in $MACS; do IFS=$OIFS
     COUNTER=$(grep -i -e "$MAC" $TMP_FILE | cut -f -1 -d " " | tr -d "[]")
-    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":")
-    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":")
+    PACKET_COUNTER=$(echo $COUNTER | cut -f 1 -d ":" | awk '{{SUM += $1}} END {{ print SUM; }}')
+    BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":" | awk '{{SUM += $1}} END {{ print SUM; }}')
 
     if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
       $IPT -I FORWARD -m mac --mac-source $MAC -c $PACKET_COUNTER $BIT_COUNTER;
