@@ -312,7 +312,7 @@ rm $TMP_FILE
 
 # Restart munin-node if needed
 if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
-  $MUNIN_NODE_RESTART_CMD
+  eval $MUNIN_NODE_RESTART_CMD
 fi
 
 exit 0
