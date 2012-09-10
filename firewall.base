@@ -222,9 +222,6 @@ start() {{
     $IPT -t nat -A POSTROUTING -p tcp -j SNAT -o $LAN --dport $PORT_TO --to-source $LAN_IP
   done
 
-  # CUSTOM RULES : VLAN administration
-  $IPT -A FORWARD -i eth3.10 -o $WAN -s 10.10.0.0/24 -m state --state NEW -j ACCEPT
-
   # NAT
   $IPT -t nat -A POSTROUTING -j SNAT -o $WAN --to-source $WAN_IP
   
