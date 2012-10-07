@@ -172,9 +172,9 @@ start() {{
     BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":" | awk '{{SUM += $1}} END {{ print SUM; }}')
 
     if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
-      $IPT -I FORWARD -m mac --mac-source $MAC -c $PACKET_COUNTER $BIT_COUNTER;
+      $IPT -I FORWARD -m mac --mac-source $MAC -m comment --comment "$NAME" -c $PACKET_COUNTER $BIT_COUNTER;
     else
-      $IPT -I FORWARD -m mac --mac-source $MAC;
+      $IPT -I FORWARD -m mac --mac-source $MAC -m comment --comment "$NAME";
     fi
 
     if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
@@ -198,9 +198,9 @@ start() {{
     BIT_COUNTER=$(echo $COUNTER | cut -f 2 -d ":" | awk '{{SUM += $1}} END {{ print SUM; }}')
 
     if [ ! -z "$PACKET_COUNTER" -o ! -z "$BIT_COUNTER" ]; then
-      $IPT -I FORWARD -m mac --mac-source $MAC -c $PACKET_COUNTER $BIT_COUNTER;
+      $IPT -I FORWARD -m mac --mac-source $MAC -m comment --comment "$NAME" -c $PACKET_COUNTER $BIT_COUNTER;
     else
-      $IPT -I FORWARD -m mac --mac-source $MAC;
+      $IPT -I FORWARD -m mac --mac-source $MAC -m comment --comment "$NAME";
     fi
 
     if [ "$MUNIN" -eq "1" -a -d "$MUNIN_PLUGINS_PATH_FROM" -a -d "$MUNIN_PLUGINS_PATH_TO" ]; then
