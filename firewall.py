@@ -8,6 +8,7 @@ import ConfigParser
 import re
 import sys
 import os
+import stat
 
 config = ConfigParser.RawConfigParser()
 if isfile('./firewall.conf'):
@@ -248,6 +249,9 @@ class Script:
     
     def _close_file_handler(self):
         self.fh.close()
+        st = os.stat(self.fh.name)
+        #Gives +x right
+        os.chmod(self.fh.name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         self.fh = None
     
     def _get_section(self, section):
