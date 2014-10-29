@@ -246,8 +246,8 @@ start() {{
   #     Log      #
   ################
 
-  $IPT -A INPUT -j LOG --log-prefix "[DROP4] "
-  $IPT -A FORWARD -j LOG --log-prefix "[FW4] "
+  #$IPT -A INPUT -j LOG --log-prefix "[DROP4] "
+  #$IPT -A FORWARD -j LOG --log-prefix "[FW4] "
   #$IP6T -A INPUT -j LOG --log-prefix "[DROP6] "
   #$IP6T -A FORWARD -j LOG --log-prefix "[FW6] "
 
